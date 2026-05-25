@@ -1,0 +1,50 @@
+name: Deploy Flask App
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::711210709046:role/GitHubOIDCRole
+          aws-region: ap-south-1
+
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
+
+      - name: SSH into EC2 and Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+
+          script: |
+            sudo docker stop flask-app || true
+            sudo docker rm flask-app || true
+
+            cd /home/ubuntu
+
+            rm -rf oidc-devops-project
+
+            git clone https://github.com/Yogitha01/oidc-devops-project.git
+
+            cd oidc-devops-project
+
+            sudo docker build -t flask-app .
+
+            sudo docker run -d -p 5000:5000 --name flask-app flask-app
